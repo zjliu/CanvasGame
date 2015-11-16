@@ -1,0 +1,26 @@
+{
+  "name": "templatepackage",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "dependencies": {
+    "gulp": "*",
+    "gulp-uglify": "git+https://github.com/mishoo/UglifyJS2.git#af22b9c657494748e3d643a7b3a9fa74467a2c52"
+  },
+  "devDependencies": {
+    "gulp-clean-dest": "^0.1.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zjliu/CanvasGame.git"
+  },
+  "author": "liuzhijunsw@126.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zjliu/CanvasGame/issues"
+  },
+  "homepage": "https://github.com/zjliu/CanvasGame#readme"
+}
