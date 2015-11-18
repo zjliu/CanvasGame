@@ -1,0 +1,132 @@
+<!DOCTYPE htmle>
+<html>
+	<head>
+		<title></title>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta http-equiv="content-type" content="text/html" charset="utf-8">
+		<meta name="description" content="">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0">
+		<link href="../reset.css" rel="stylesheet" />
+		<link href="../layout.css" rel="stylesheet" />
+		<script src="../CanvasCommon.js"></script>
+		<script src="../Shape.js"></script>
+		<script src="../Sprite.js"></script>
+	</head>
+	<body>
+		<article><canvas id="canvas" width='640' height='480'></canvas></article>
+		<div id="bgDiv" style="position:absolute;top:50;left:50">
+		</div>
+	</body>
+</html>
+<script>
+var canvas = G('canvas');
+var cxt = canvas.getContext('2d');
+var W = canvas.width;
+var H = canvas.height;
+var cc=0;
+
+var x_distance=(v0,a,t)=>{return {vt:v0+a*t,s:v0*t+0.5*a*t*t}};
+var x_vt=(v0,a,t)=>v0+a*t;
+var x_ds=(v0,a,t)=>v0*t+a*t*t/2;
+var img = new Image();
+var bgCanvas = document.createElement`canvas`;
+var bgCxt = bgCanvas.getContext`2d`;
+var bgDiv = G`bgDiv`;
+bgDiv.appendChild(bgCanvas);
+var noroll = false;
+
+var bool = new Sprite('bool',
+	{
+		paint:function(sprite,context){
+			context.save();
+			context.beginPath();
+			/*
+			context.fillStyle='red';
+			context.arc(sprite.left,sprite.top,sprite.width/2,0,Math.PI*2);
+			context.fill();
+			*/
+			if(!noroll && bool.velocityX!==0){
+				bgCxt.translate(bgCanvas.width/2,bgCanvas.height/2);
+				var dir = bool.velocityX > 0 ? 1 : -1;
+				bgCxt.rotate(dir*Math.PI/180);
+				bgCxt.translate(-bgCanvas.width/2,-bgCanvas.height/2);
+				bgCxt.drawImage(img,0,0,img.width,img.height);
+			}
+			context.drawImage(bgCanvas,sprite.left-sprite.width/2,sprite.top-sprite.height/2,bgCanvas.width,bgCanvas.height);
+			context.restore();
+		}
+	},[
+		{
+			lastMove :0,
+			accX:0,
+			stop:false,
+			execute:function(sprite,context,now){
+				if(this.stop) {
+					sprite.velocityY=sprite.velocityY*0.9;
+					return;
+				}
+				if(this.lastMove!==0) {
+					var dobj = x_distance(sprite.velocityX,this.accX,(now-this.lastMove)/1000);
+					sprite.left+=dobj.s;
+					sprite.velocityX = dobj.vt;
+					if(sprite.velocityX>0 && sprite.left+sprite.width/2>W 
+						|| sprite.velocityX<0 && sprite.left-sprite.width/2<0) {
+						sprite.velocityX=-sprite.velocityX*0.9;
+							if(Math.abs(sprite.velocityX)<10) this.stop = true;
+						}
+				}
+				this.lastMove = now;
+			}
+		},
+		{
+			lastMove:0,
+			accY:800,
+			stop:false,
+			execute:function(sprite,context,now){
+				if(this.stop) {
+					noroll = true;
+					sprite.velocityX=sprite.velocityX*0.9;
+					return;
+				}
+				if(this.lastMove!==0) {
+					var dobj = x_distance(sprite.velocityY,this.accY,(now-this.lastMove)/1000);
+					sprite.top+=dobj.s;
+					sprite.velocityY = dobj.vt;
+					if(sprite.velocityY>0 && sprite.top+sprite.height/2>H ||sprite.velocityY<0 && sprite.top-sprite.height/2<0){
+							sprite.velocityY=-sprite.velocityY*0.9;
+							if(Math.abs(sprite.velocityY)<10) this.stop = true;
+					}
+				}
+				this.lastMove = now;
+			}
+		}
+	]
+);
+
+bool.top = 50;
+bool.left = H/2;
+
+bool.width = 50;
+bool.height = 50;
+
+bool.velocityX = 500;
+bool.velocityY = 90;
+
+function draw(){
+	cxt.clearRect(0,0,W,H);
+	bool.print(cxt);
+	bool.update(cxt,+new Date);
+	requestAnimationFrame(draw);
+}
+
+img.src='../images/bool.png';
+bgCanvas.width = img.width = bool.width;
+bgCanvas.height = img.height = bool.height;
+img.onload=function(){
+	bgCxt.drawImage(img,0,0,img.width,img.height);
+	requestAnimationFrame(draw);
+}
+
+
+</script>
