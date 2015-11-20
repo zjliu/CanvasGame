@@ -19,124 +19,114 @@
 </html>
 <script>
 
-var BoolPaint = {
-	paint:function(sprite,context){
-		context.save();
-		context.beginPath();
-		context.fillStyle= sprite.color || 'red';
-		context.arc(sprite.left,sprite.top,sprite.width/2,0,Math.PI*2);
-		context.fill();
-		context.restore();
-	}
-};
-
-var moveBehavior = {
-	lastMove :0,
-	accX:0,
-	stop:false,
-	execute:function(sprite,context,now){
-		if(this.stop) {
-			return;
-		}
-		if(this.lastMove!==0) {
-			var dobj = x_distance(sprite.velocityX,this.accX,(now-this.lastMove)/1000);
-			sprite.left+=dobj.s;
-			sprite.velocityX = dobj.vt;
-			if(sprite.velocityX>0 && sprite.left+sprite.width/2>W 
-				|| sprite.velocityX<0 && sprite.left-sprite.width/2<0) {
-				sprite.velocityX=-sprite.velocityX*0.9;
-					if(Math.abs(sprite.velocityX)<10) this.stop = true;
-				}
-		}
-		this.lastMove = now;
-	}
-};
-
-function Boll(name,painter,behaviors){
-	Sprite.call(this,name,painter,behaviors);
-}
-Boll.prototype=Object.create(Sprite.prototype);
+var x_distance=(v0,a,t)=>{return {vt:v0+a*t,s:v0*t+0.5*a*t*t}};
+var x_vt=(v0,a,t)=>v0+a*t;
+var x_ds=(v0,a,t)=>v0*t+a*t*t/2;
 
 var canvas = G('canvas');
 var cxt = canvas.getContext('2d');
 var W = canvas.width;
 var H = canvas.height;
-var cc=0;
 
-var x_distance=(v0,a,t)=>{return {vt:v0+a*t,s:v0*t+0.5*a*t*t}};
-var x_vt=(v0,a,t)=>v0+a*t;
-var x_ds=(v0,a,t)=>v0*t+a*t*t/2;
+function moveX(sprite,context,now){
+	if(sprite.stop) { return; }
+	if(sprite.lastMoveX!==0) {
+		var dobj = x_distance(sprite.velocityX,sprite.accx,(now-sprite.lastMoveX)/1000);
+		sprite.left+=dobj.s;
+		sprite.velocityX = dobj.vt;
+		/*
+		if(Math.abs(sprite.velocityX)<10) {
+			sprite.accx=0;
+			sprite.velocityX=0;
+			return;
+		}
+		*/
+		if(sprite.velocityX>0 && sprite.left+sprite.width/2>W 
+			|| sprite.velocityX<0 && sprite.left-sprite.width/2<0) {
+			sprite.velocityX=-sprite.velocityX;
+			sprite.accx = (sprite.velocityX>0?-1:1)*Math.abs(sprite.accx);
+				if(Math.abs(sprite.velocityX)<10) sprite.stop = true;
+		}
+	}
+	sprite.lastMoveX = now;
+}
+function moveY(sprite,context,now){
+	if(sprite.stop) { return; }
+	if(sprite.lastMoveY!==0) {
+		var dobj = x_distance(sprite.velocityY,sprite.accy,(now-sprite.lastMoveY)/1000);
+		sprite.top+=dobj.s;
+		sprite.velocityY = dobj.vt;
+		/*
+		if(Math.abs(sprite.velocityY)<10) {
+			sprite.accy=0;
+			sprite.velocityY=0;
+			return;
+		}
+		*/
+		if(sprite.velocityY>0 && sprite.top+sprite.height/2>H 
+			|| sprite.velocityY<0 && sprite.top-sprite.height/2<0) {
+			sprite.velocityY=-sprite.velocityY;
+			sprite.accy = (sprite.velocityY>0?-1:1)*Math.abs(sprite.accy);
+				if(Math.abs(sprite.velocityY)<10) sprite.stop = true;
+			}
+	}
+	sprite.lastMoveY = now;
+}
 
-var bool = new Sprite('bool',
-	{
+function Bool(name){
+	this.accx = 0;
+	this.accy = 0;
+	this.sprite = new Sprite(name);
+	this.shape = new Circle();
+	var self = this;
+	this.sprite.painter={
 		paint:function(sprite,context){
+			self.updateShape();
 			context.save();
-			context.beginPath();
-			context.fillStyle='red';
-			context.arc(sprite.left,sprite.top,sprite.width/2,0,Math.PI*2);
+			self.shape.createPath(context);
+			context.fillStyle=self.shape.fillStyle;
+			context.strokeStyle=self.shape.strokeStyle;
 			context.fill();
+			context.stroke();
 			context.restore();
 		}
-	},[
-		{
-			lastMove :0,
-			accX:0,
-			stop:false,
-			execute:function(sprite,context,now){
-				if(this.stop) {
-					sprite.velocityY=sprite.velocityY*0.9;
-					return;
-				}
-				if(this.lastMove!==0) {
-					var dobj = x_distance(sprite.velocityX,this.accX,(now-this.lastMove)/1000);
-					sprite.left+=dobj.s;
-					sprite.velocityX = dobj.vt;
-					if(sprite.velocityX>0 && sprite.left+sprite.width/2>W 
-						|| sprite.velocityX<0 && sprite.left-sprite.width/2<0) {
-						sprite.velocityX=-sprite.velocityX*0.9;
-							if(Math.abs(sprite.velocityX)<10) this.stop = true;
-						}
-				}
-				this.lastMove = now;
-			}
-		},
-		{
-			lastMove:0,
-			accY:800,
-			stop:false,
-			execute:function(sprite,context,now){
-				if(this.stop) {
-					sprite.velocityX=sprite.velocityX*0.9;
-					return;
-				}
-				if(this.lastMove!==0) {
-					var dobj = x_distance(sprite.velocityY,this.accY,(now-this.lastMove)/1000);
-					sprite.top+=dobj.s;
-					sprite.velocityY = dobj.vt;
-					if(sprite.velocityY>0 && sprite.top+sprite.height/2>H ||sprite.velocityY<0 && sprite.top-sprite.height/2<0){
-							sprite.velocityY=-sprite.velocityY*0.9;
-							if(Math.abs(sprite.velocityY)<10) this.stop = true;
-					}
-				}
-				this.lastMove = now;
-			}
-		}
-	]
-);
+	}
+	this.sprite.behaviors=[{execute:moveX},{execute:moveY}];
+}
+Bool.prototype.updateShape=function(){
+	this.shape.x=this.sprite.left;
+	this.shape.y=this.sprite.top;
+	this.shape.radius=this.sprite.width/2;
+}
+Bool.prototype.update=function(left,top,width,height,velocityx,velocityy,ax,ay){
+	this.sprite.left=left;
+	this.sprite.top=top;
+	this.sprite.width=width;
+	this.sprite.height=height;
+	this.sprite.velocityX=velocityx;
+	this.sprite.velocityY=velocityy;
+	this.sprite.accx=ax;
+	this.sprite.accy=ay;
+	this.sprite.lastMoveX = 0;
+	this.sprite.lastMoveY = 0;
+}
 
-bool.top = 50;
-bool.left = H/2;
 
-bool.width = 50;
-bool.height = 50;
+//left,top,width,height,velocityx,velocityy,ax,ay
+var bool = new Bool('Boll');
+bool.update(  50,H/2, 20,20,500,400,-150,-150);
+var bool2 = new Bool('b2');
+bool2.update(W/2,H-60,20,20,0,0,0,0);
 
-bool.velocityX = 500;
-bool.velocityY = 90;
+
+var bools = [bool,bool2];
 
 function draw(){
 	cxt.clearRect(0,0,W,H);
-	bool.print(cxt);
-	bool.update(cxt,+new Date);
+	bools.forEach(function(bool){
+		bool.sprite.print(cxt);
+		bool.sprite.update(cxt,+new Date);
+	});
 	requestAnimationFrame(draw);
 }
 

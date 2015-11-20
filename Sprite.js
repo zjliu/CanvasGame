@@ -86,6 +86,7 @@ Sprite.prototype = {
 		}
 	}
 }
+
 //ImagePainter
 var ImagePainter = function (imageUrl){
 	this.image = new Image();
