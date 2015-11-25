@@ -20,6 +20,7 @@
 <script>
 
 var x_distance=(v0,a,t)=>{return {vt:v0+a*t,s:v0*t+0.5*a*t*t}};
+var getDistance=(vx,vy,ax,ay,t)=>{return {vxt:vx+ax*t,vyt:vy+ay*t,sx:vx*t+0.5*ax*t*t,sy:vy*t+0.5*ay*t*t}};
 var x_vt=(v0,a,t)=>v0+a*t;
 var x_ds=(v0,a,t)=>v0*t+a*t*t/2;
 
@@ -28,102 +29,145 @@ var cxt = canvas.getContext('2d');
 var W = canvas.width;
 var H = canvas.height;
 
-function moveX(sprite,context,now){
-	if(sprite.stop) { return; }
-	if(sprite.lastMoveX!==0) {
-		var dobj = x_distance(sprite.velocityX,sprite.accx,(now-sprite.lastMoveX)/1000);
-		sprite.left+=dobj.s;
-		sprite.velocityX = dobj.vt;
-		/*
-		if(Math.abs(sprite.velocityX)<10) {
-			sprite.accx=0;
-			sprite.velocityX=0;
-			return;
-		}
-		*/
-		if(sprite.velocityX>0 && sprite.left+sprite.width/2>W 
-			|| sprite.velocityX<0 && sprite.left-sprite.width/2<0) {
-			sprite.velocityX=-sprite.velocityX;
-			sprite.accx = (sprite.velocityX>0?-1:1)*Math.abs(sprite.accx);
-				if(Math.abs(sprite.velocityX)<10) sprite.stop = true;
-		}
-	}
-	sprite.lastMoveX = now;
+function newLine(x1,y1,x2,y2,dx,dy){
+	var line = new Line();
+	line.addPoint(x1,y1);
+	line.addPoint(x2,y2);
+	line.dx = dx;
+	line.dy = dy;
+	return line;
 }
-function moveY(sprite,context,now){
-	if(sprite.stop) { return; }
-	if(sprite.lastMoveY!==0) {
-		var dobj = x_distance(sprite.velocityY,sprite.accy,(now-sprite.lastMoveY)/1000);
-		sprite.top+=dobj.s;
-		sprite.velocityY = dobj.vt;
-		/*
-		if(Math.abs(sprite.velocityY)<10) {
-			sprite.accy=0;
-			sprite.velocityY=0;
-			return;
+var walls = [newLine(0,0,W,0,1,-1),newLine(0,0,0,H,-1,1),newLine(W,0,W,H,-1,1),newLine(0,H,W,H,1,-1)];
+
+function move(sprite,context,now){
+	if(sprite.stop) return;
+	var self = sprite, vx=self.velocityX, vy=self.velocityY, ax=self.accx, ay=self.accy;
+		self.preTime = self.preTime || 0;
+	if(self.preTime){
+		var t=(now-self.preTime)/1000,
+			dObj = getDistance(vx,vy,ax,ay,t);
+		var orgx = self.left;
+		var orgy = self.top;
+		self.left+=dObj.sx;
+		self.top+=dObj.sy;
+		self.velocityX=dObj.vxt;
+		self.velocityY=dObj.vyt;
+		if(self.getVelocity()<200){
+			self.velocityX=0;
+			self.velocityY=0;
+			sprite.stop = true;
 		}
-		*/
-		if(sprite.velocityY>0 && sprite.top+sprite.height/2>H 
-			|| sprite.velocityY<0 && sprite.top-sprite.height/2<0) {
-			sprite.velocityY=-sprite.velocityY;
-			sprite.accy = (sprite.velocityY>0?-1:1)*Math.abs(sprite.accy);
-				if(Math.abs(sprite.velocityY)<10) sprite.stop = true;
+		walls.forEach(function(wall){
+			if(wall.collidesWith(self.shape)){
+				//保证是靠近的才算，解决短时间内两次碰撞的问题
+				//if(wall.getPointDistance(orgx,orgy)>wall.getPointDistance(self.left,self.top)){
+				//10毫秒内不允许两次碰撞
+				if(!self.preCollidesTime || (now-self.preCollidesTime)>100){
+					if(wall.dx<0){
+						self.velocityX=-self.velocityX;
+						self.accx =(self.velocityX>0?-1:1)*Math.abs(self.accx);
+					}
+					if(wall.dy<0){
+						self.velocityY=-self.velocityY;
+						self.accy =(self.velocityY>0?-1:1)*Math.abs(self.accy);
+					}
+					self.preCollidesTime = now;
+				}
 			}
+		});
 	}
-	sprite.lastMoveY = now;
+	self.preTime = now;
 }
 
 function Bool(name){
 	this.accx = 0;
 	this.accy = 0;
 	this.sprite = new Sprite(name);
-	this.shape = new Circle();
 	var self = this;
 	this.sprite.painter={
 		paint:function(sprite,context){
 			self.updateShape();
 			context.save();
-			self.shape.createPath(context);
-			context.fillStyle=self.shape.fillStyle;
-			context.strokeStyle=self.shape.strokeStyle;
+			sprite.shape.createPath(context);
+			context.fillStyle=sprite.shape.fillStyle;
+			context.strokeStyle=sprite.shape.strokeStyle;
 			context.fill();
 			context.stroke();
 			context.restore();
 		}
 	}
-	this.sprite.behaviors=[{execute:moveX},{execute:moveY}];
+	this.sprite.behaviors=[{execute:move}];
+	this.sprite.shape = new Circle();
 }
+
 Bool.prototype.updateShape=function(){
-	this.shape.x=this.sprite.left;
-	this.shape.y=this.sprite.top;
-	this.shape.radius=this.sprite.width/2;
+	var shape = this.sprite.shape;
+	shape.radius=this.sprite.width/2;
+	shape.x=this.sprite.left-shape.radius;
+	shape.y=this.sprite.top-shape.radius;
 }
+
 Bool.prototype.update=function(left,top,width,height,velocityx,velocityy,ax,ay){
-	this.sprite.left=left;
-	this.sprite.top=top;
-	this.sprite.width=width;
-	this.sprite.height=height;
-	this.sprite.velocityX=velocityx;
-	this.sprite.velocityY=velocityy;
-	this.sprite.accx=ax;
-	this.sprite.accy=ay;
-	this.sprite.lastMoveX = 0;
-	this.sprite.lastMoveY = 0;
+	var shape = this.sprite;
+	shape.left=left;
+	shape.top=top;
+	shape.width=width;
+	shape.height=height;
+	shape.velocityX=velocityx;
+	shape.velocityY=velocityy;
+	shape.accx=ax;
+	shape.accy=ay;
 }
 
+Sprite.prototype.getVelocity=function(){
+	return this.velocityX*this.velocityX+this.velocityY*this.velocityY;
+}
 
-//left,top,width,height,velocityx,velocityy,ax,ay
-var bool = new Bool('Boll');
-bool.update(  50,H/2, 20,20,500,400,-150,-150);
-var bool2 = new Bool('b2');
-bool2.update(W/2,H-60,20,20,0,0,0,0);
+Line.prototype.getPointDistance=function(x,y,flag){
+	var x1=this.points[0].x,y1=this.points[0].y;
+	var x2=this.points[1].x,y2=this.points[1].y;
+	var k=0,b=0,A=0,B=0,C=0,d=0;
+	if(x2!==x1){ A=(y2-y1)/(x2-x1); B=-1; C=y1-k*x1; }
+	else{ A=1;B=0;C=-x1; }
+	var s = Math.pow(A*x+B*y+C,2)/(A*A+B*B);
+	return flag?Math.sqrt(s):s;
+}
 
+function renum(x,y){
+	return x*y>0?-y:y;
+}
 
-var bools = [bool,bool2];
+function getK(vx,vy){
+	return Math.abs(vx)/(Math.abs(vx)+ Math.abs(vy));
+}
+
+function getAcc(vx,vy,a){
+	var Vx=Math.abs(vx),
+		Vy=Math.abs(vy),
+		V=Vx+Vy,
+		kx=vx*a>0?-a:a,
+		ky=vy*a>0?-a:a;
+	return { ax:(Vx/V)*kx, ay:(Vy/V)*ky }
+}
+
+function createBoll(x,y,r,vx,vy,a){
+	var bool=new Bool('Boll');
+	var obj=getAcc(vx,vy,a);
+	//left,top,width,height,velocityx,velocityy,ax,ay
+	bool.update(x,y,r,r,vx,vy,obj.ax,obj.ay);
+	return bool;
+}
+
+var sps = [
+	createBoll(W/2,H/2,20,400,-100,20),
+	createBoll(W/2,H/2,20,-400,100,20),
+	createBoll(W/2,H/2,20,-400,-100,20),
+	createBoll(W/2,H/2,20,400,100,20),
+];
 
 function draw(){
-	cxt.clearRect(0,0,W,H);
-	bools.forEach(function(bool){
+	//cxt.clearRect(0,0,W,H);
+	sps.forEach(function(bool){
 		bool.sprite.print(cxt);
 		bool.sprite.update(cxt,+new Date);
 	});
