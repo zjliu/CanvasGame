@@ -195,6 +195,35 @@ Line.prototype.update = function(point){
 	if(len<2)this.points.push(new Point(point.x,point.y));
 	else Point.call(this.points[1],point.x,point.y);
 }
+Line.prototype.mathPoints = function(){
+	return {x1:this.points[0].x,y1:this.points[0].y,x2:this.points[1].x,y2:this.points[1].y};
+}
+Line.prototype.getSlope = function(){
+	with(this.mathPoints()) return x2===x1?0:(y2-y1)/(x2-x1); 
+}
+Line.prototype.getFun = function(){
+	var k=this.getSlope(),b=this.points[0].y-k*this.points[0].x;
+	return {k:k,b:b};
+}
+Line.prototype.meetPoint = function(line){
+	var f1 = this.getFun(),f2=line.getFun();
+	if(f1.k===f2.k) return null;
+	var x = -(f2.b-f1.b)/(f2.k-f1.k);
+	return new Point(x,f1.k*x+f1.b);
+}
+Line.prototype.getPointDistance = function(x,y){
+	with(this.getFun()) return Math.abs(k*x-y+b)/Math.sqrt(k*k+1);
+}
+//得到点(x,y)位于直线的方位(正值为上右方，负值为左下方，零为在直线上)
+Line.prototype.getPP=function(x,y){
+	with(this.getFun()) return k*x-y+b;
+}
+Line.prototype.distancePoint=function(x0,y0,r){
+	with(this.getFun()){
+		var tk=1/Math.sqrt(1+k*k);
+		return [new Point(x0+r*tk,y0+r*k*tk),new Point(x0-r*tk,y0-r*k*tk)];
+	}
+}
 
 /**
  *多边形(包括三角形)
