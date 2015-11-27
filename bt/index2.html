@@ -10,8 +10,8 @@
 		<link href="../reset.css" rel="stylesheet" />
 		<link href="../layout.css" rel="stylesheet" />
 		<script src="../CanvasCommon.js"></script>
-		<script src="../Shape.js"></script>
-		<script src="../Sprite.js"></script>
+		<script src="Shape.js"></script>
+		<script src="Sprite.js"></script>
 	</head>
 	<body>
 		<article><canvas id="canvas" width='640' height='480'></canvas></article>
@@ -25,7 +25,7 @@ function guidGen() {
    if(now <= g_prevTime) now = g_prevTime + 1; g_prevTime = now;
    var num = (now-new Date('2013/1/1').getTime())+''+Math.random().toString().substr(2,4);
    return Number(num).toString(36);
-};
+}
 
 var x_distance=(v0,a,t)=>{return {vt:v0+a*t,s:v0*t+0.5*a*t*t}};
 var getDistance=(vx,vy,ax,ay,t)=>{return {vxt:vx+ax*t,vyt:vy+ay*t,sx:vx*t+0.5*ax*t*t,sy:vy*t+0.5*ay*t*t}};
@@ -57,24 +57,27 @@ var walls = [
 walls.forEach(function(wall){ wall.pp=wall.getPP(W/2,H/2); });
 //小球
 var sps = [];
+//摩擦力加速度（质量一定的情况下）
+var friction = 5;
 
-function move(sprite,context,now){
-	if(sprite.stop) return;
-	var self = sprite, vx=self.velocityX, vy=self.velocityY, ax=self.accx, ay=self.accy;
-		self.preTime = self.preTime || 0;
-	if(self.preTime){
-		var t=(now-self.preTime)/1000,
-			dObj = getDistance(vx,vy,ax,ay,t);
-		var orgx = self.left;
-		var orgy = self.top;
-		self.left+=dObj.sx;
-		self.top+=dObj.sy;
-		self.velocityX=dObj.vxt;
-		self.velocityY=dObj.vyt;
-		if(self.getVelocity()<200){
-			self.velocityX=0;
-			self.velocityY=0;
-			sprite.stop = true;
+function move(context,now){
+	if(this.animating) return;
+	var self = this, vx=this.velocityX, vy=this.velocityY, ax=this.accelerationX, ay=this.accelerationY;
+		this.preTime = this.preTime || 0;
+	if(this.preTime){
+		var t=(now-this.preTime)/1000;
+		if(t>0.2) t=0;
+		var dObj = getDistance(vx,vy,ax,ay,t);
+		var orgx = this.left;
+		var orgy = this.top;
+		with(this){
+			left+=dObj.sx;
+			top+=dObj.sy;
+			velocityX=dObj.vxt;
+			velocityY=dObj.vyt;
+			preVelocityX=orgx;
+			preVelocityY=orgy;
+			checkStop();
 		}
 		walls.forEach(function(wall){
 			if(wall.collidesWith(self.shape) || wall.getPP(self.left,self.top)*wall.pp<0){
@@ -87,12 +90,12 @@ function move(sprite,context,now){
 				//self.preCollidesTime = now;
 				if(wall.dx<0){
 					self.velocityX=-self.velocityX;
-					self.accx =(self.velocityX>0?-1:1)*Math.abs(self.accx);
+					self.accelerationX =(self.velocityX>0?-1:1)*Math.abs(self.accelerationX);
 					self.left=wall.points[0].x+wall.flag*self.shape.radius;
 				}
 				if(wall.dy<0){
 					self.velocityY=-self.velocityY;
-					self.accy =(self.velocityY>0?-1:1)*Math.abs(self.accy);
+					self.accelerationY =(self.velocityY>0?-1:1)*Math.abs(self.accelerationY);
 					self.top=wall.points[0].y+wall.flag*self.shape.radius;
 				}
 			}
@@ -102,23 +105,19 @@ function move(sprite,context,now){
 }
 
 function Bool(name){
-	this.accx = 0;
-	this.accy = 0;
 	this.sprite = new Sprite(name);
 	var self = this;
-	this.sprite.painter={
-		paint:function(sprite,context){
-			self.updateShape();
-			context.save();
-			sprite.shape.createPath(context);
-			context.fillStyle=sprite.shape.fillStyle;
-			context.strokeStyle=sprite.shape.strokeStyle;
-			context.fill();
-			context.stroke();
-			context.restore();
-		}
+	this.sprite.painter = function(context){
+		self.updateShape();
+		context.save();
+		this.shape.createPath(context);
+		context.fillStyle=this.shape.fillStyle;
+		context.strokeStyle=this.shape.strokeStyle;
+		context.fill();
+		context.stroke();
+		context.restore();
 	}
-	this.sprite.behaviors=[{execute:move}];
+	this.sprite.behaviors=[move];
 	this.sprite.shape = new Circle();
 	this.sprite.guid=guidGen();
 }
@@ -137,14 +136,17 @@ Bool.prototype.update=function(left,top,width,height,velocityx,velocityy,ax,ay){
 	shape.width=width;
 	shape.height=height;
 	shape.velocityX=velocityx;
+	shape.preVelocityX=velocityx;
 	shape.velocityY=velocityy;
-	shape.accx=ax;
-	shape.accy=ay;
+	shape.preVelocityY=velocityy;
+	shape.accelerationX=ax;
+	shape.accelerationY=ay;
 }
 
 Sprite.prototype.getVelocity=function(){
 	return this.velocityX*this.velocityX+this.velocityY*this.velocityY;
 }
+
 Sprite.prototype.updateShape = function(){
 	with(this.shape){
 		radius=this.width/2;
@@ -153,12 +155,14 @@ Sprite.prototype.updateShape = function(){
 	}
 }
 
-function renum(x,y){
-	return x*y>0?-y:y;
-}
-
-function getK(vx,vy){
-	return Math.abs(vx)/(Math.abs(vx)+ Math.abs(vy));
+//停上运动
+Sprite.prototype.checkStop=function(){
+	this.animating = false;
+	if(this.getVelocity()<200){
+		this.velocityX=0;
+		this.velocityY=0;
+		this.animating = true;
+	}
 }
 
 function getAcc(vx,vy,a){
@@ -167,10 +171,17 @@ function getAcc(vx,vy,a){
 		V=Vx+Vy,
 		kx=vx*a>0?-a:a,
 		ky=vy*a>0?-a:a;
-	return { ax:(Vx/V)*kx, ay:(Vy/V)*ky }
+	return { ax:vx===0?0:(Vx/V)*kx, ay:vy===0?0:(Vy/V)*ky }
+}
+
+function updateAcc(sprite){
+	var obj=getAcc(sprite.velocityX,sprite.velocityY,friction);
+	sprite.accelerationX=obj.ax;
+	sprite.accelerationY=obj.ay;
 }
 
 function createBoll(x,y,r,vx,vy,a){
+	if(a===undefined) a=friction;
 	var bool=new Bool('Boll');
 	var obj=getAcc(vx,vy,a);
 	//left,top,width,height,velocityx,velocityy,ax,ay
@@ -186,34 +197,40 @@ function createBoll(x,y,r,vx,vy,a){
 */
 
 sps = [
-	createBoll(W/2,H/2+50,20,-200,-40,20),
-	createBoll(W/2,H/2-50,20,-200,40,20)
+	createBoll(W/2+100,H/2,20,-100,0),
+	createBoll(W/2-100,H/2,20,0,0)
 ];
 
 function collidesBool(){
-	var b1,b2,cbs=[];
+	var b1,b2;
 	for(var i=0,il=sps.length-1;i<il;i++){
 		b1=sps[i].sprite;
 		sps[i].updateShape();
 		for(var j=i+1;j<sps.length;j++){
 			sps[j].updateShape();
 			b2=sps[j].sprite;
+			if(b1.animating && b2.animating) break;
 			if(b1.shape.collidesWith(b2.shape)){
-				cbs.push([b1,b2]);
-				var tx=b1.velocityX,ty=b1.velocityY;
+				var tx=b1.velocityX,ty=b1.velocityY, ax=b1.ax, ay=b1.ay;
 				b1.velocityX=b2.velocityX;
 				b1.velocityY=b2.velocityY;
+				b1.accelerationX=b2.ax;
+				b1.accelerationY=b2.ay;
 				b2.velocityX=tx;
 				b2.velocityY=ty;
+				b2.accelerationX=ax;
+				b2.accelerationY=ay;
 			}
 		}
 	}
 }
 
 function draw(){
-	//cxt.clearRect(0,0,W,H);
+	cxt.clearRect(0,0,W,H);
 	sps.forEach(function(bool){
 		bool.sprite.print(cxt);
+		bool.sprite.checkStop();
+		updateAcc(bool.sprite);
 		bool.sprite.update(cxt,+new Date);
 	});
 	collidesBool();
